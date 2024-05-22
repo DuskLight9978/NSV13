@@ -38,7 +38,7 @@
 	dir = 8
 	var/active = FALSE //its a probe, its either in bluespace or not. we can delay deactivation to simulate withdrawing
 	var/deactivation_delay = 300 SECONDS //5 Minutes to withdraw the probe
-	var/list/gas_records = list() //ohgod...tgui time
+	var/list/gas_records = list() //ohgod...tgui time TODO
 	var/list/probes = list() //ordinarily we have one probe.. maybe a future upgrade to add a second probe?
 	var/plane_stability = 10000 //How fucked did we make the region of bluespace this drive touches?
 	var/max_plane_stability = 10000 //How stable can we make the unstable?
@@ -137,9 +137,146 @@
 	circuit = /obj/item/circuitboard/computer/brc_console
 	var/obj/machinery/atmospherics/components/unary/brc/compressor
 	var/reactor_id = null //var for mappers to link machine to console
+
+/obj/machinery/computer/ship/brc_console/attackby(obj/item/I, mob/user, params)
+	if(I.tool_behaviour == TOOL_MULTITOOL)
+		if(!multitool_check_buffer(user, I))
+			return
+		var/obj/item/multitool/M = I
+		compressor = M.buffer
+		M.buffer = null
+		playsound(src, 'sound/items/flashlight_on.ogg', 100, TRUE)
+		to_chat(user, "<span class='notice'>Buffer transfered</span>")
+/obj/machinery/computer/ship/brc_console/attack_hand(mob/user)
+	if(!compressor)
+		playsound(src, 'nsv13/sound/effects/computer/error.ogg')
+		to_chat(user, "<span class='warning'>Not presently linked to a compressor</span>")
+		return
+
+	ui_interact(user)
+
+/obj/machinery/computer/ship/brc_console/attack_robot(mob/user)
+	if(!compressor)
+		playsound(src, 'nsv13/sound/effects/computer/error.ogg')
+		to_chat(user, "<span class='warning'>Not presently linked to a compressor</span>")
+		return
+
+	ui_interact(user)
+
+/obj/machinery/computer/ship/brc_console/attack_ghost(mob/user)
+	if(!compressor)
+		to_chat(user, "<span class='warning'>Not presently linked to a compressor</span>")
+		return
+
+	.=..()
+/obj/machinery/computer/ship/brc_console/Initialize(mapload)
+	.=..()
+	new /obj/item/book/manual/wiki/stormdrive(get_turf(src))
+	return INITIALIZE_HINT_LATELOAD
+
+/obj/machinery/computer/ship/brc_console/LateInitialize()
+	if(reactor_id) //mapper sets the ID
+		for(var/obj/machinery/atmospherics/components/unary/brc/brc in GLOB.machines)
+			if(brc.reactor_id == reactor_id)
+				compressor = brc
+/*
+/obj/machinery/computer/ship/brc_console/ui_act(action, params, datum/tgui/ui)
+	if(..())
+		return
+	if(!compressor)
+		return
+	switch(action)
+		if("eject")//YEET IT INTO BLUESPACE BEFORE IT EXPLODES
+			//uh....add ejection
+		if("align")
+			var/align = text2num(params["adjust"]) //Point it at the alignment!
+			//add alignment
+		if("toggle_active")
+			//either insert or retract slowly
+		if("toggle_gas")
+			//do we want to start eating gas modifications? make this take an age to open or close so engineering cannot game it in a cheesy way
+*/
+/*/obj/machinery/computer/ship/brc_console/ui_interact(mob/user, datum/tgui/ui)
+	ui = SStgui.try_update_ui(user, src, ui)
+	if(!ui)
+		ui = new(user, src, "CompressorConsole")
+		ui.open()
+		ui.set_autoupdate(TRUE)
+
+/obj/machinery/computer/ship/brc_console/ui_data(mob/user)
+	var/list/data = list()
+	//Soon
+*/
+
 //TODO TGUI Interactions.... and TGUI
 
+ ///// techweb and board stuff /////
+/datum/design/board/brc_console
+	name = "Computer Design (Bluespace Reality Compressor Control Console)"
+	desc = "Allows for the construction of the console boards used in building a replacement Bluespace reality compressor console."
+	id = "brc_c_c"
+	build_path = /obj/item/circuitboard/computer/brc_console
+	category = list("Computer Boards")
+	departmental_flags = DEPARTMENT_BITFLAG_ENGINEERING
 
+/obj/item/circuitboard/computer/brc_console
+	name = "Bluespace Reality Compressor Console (Computer Board)"
+	build_path = /obj/machinery/computer/ship/brc_console
+/datum/techweb_node/brc_console
+	id = "brc_cc"
+	display_name = "Masonic Bluespace Compressor Console"
+	description = "Masonic Systems latest itteration of the compressor control console (automated control mode not purchased)."
+	prereq_ids = list("adv_engi", "adv_power")
+	design_ids = list("brc_c_c") //maybe allow them to build a shitty probe in the future...area
+	research_costs = list(TECHWEB_POINT_TYPE_GENERIC = 2500)
+	export_price = 3000
+
+ ///// Torn bluespace stuff /////
+/datum/weather/torn_bluespace
+	name = "torn bluespace" //Spawn unlimited lifetime anomalies that spawn hostile mobs. Make reality bubble. be spooky endtimes
+	desc = "Realities are competing in local space... you should evacuate."
+	telegraph_duration = 180
+	telegraph_message = "<span class='boldwarning'>Space distorts around you, Reality is tearing at the seams.</span>"
+	weather_message = "<span class='userdanger'><i>Your skin feels like it's burning and freezing all at once, your grip upon reality weakens!</i></span>"
+	weather_overlay = "light_ash" //replace
+	weather_overlay = "light_snow" //replace #add bubbles.... somehow
+	weather_duration_lower = 1800 //this is round ending lets make it feel round ending
+	weather_duration_upper = 7200 //this is round ending lets make it feel round ending
+	weather_color = "blue"
+	telegraph_sound = null //lets get a ripping sound eventually
+	weather_sound = 'nsv13/sound/effects/ship/reactor/falloutwind.ogg' //add boiling sound here
+	end_duration = 100
+	area_type = /area
+	protected_areas = list(/area/maintenance, /area/storage/emergency/starboard, /area/storage/emergency/port, /area/shuttle)
+	target_trait = ZTRAIT_STATION
+	end_message = "<span class='notice'Reality seems to recover... if only slightly."
+	immunity_type = "fire" //might...not...work.. check later
+
+/datum/weather/torn_bluespace/weather_act(mob/living/L)
+	L.adjustFireLoss(0.1) //This WILL add up and maybe kill you
+	L.adjustOxyLoss(0.1) //enough to make the healthbar wiggle, not enough to kill
+
+/datum/weather/torn_bluespace/telegraph()
+	..()
+	status_alarm(TRUE)
+
+/datum/weather/torn_bluespace/proc/status_alarm(active)
+	var/datum/radio_frequency/frequency = SSradio.return_frequency(FREQ_STATUS_DISPLAYS)
+	if(!frequency)
+		return
+	var/datum/signal/signal =new
+	if(active)
+		signal.data["command"] = "alert"
+		signal.data["picture_state"] = "radiation"
+	else
+		signal.data["command"] = "shuttle"
+	var/atom/movable/virtualspeaker/virt = new(null)
+	frequency.post_signal(virt, signal)
+
+/datum/weather/torn_bluespace/end()
+	if(..())
+		return
+	status_alarm(FALSE)
  ///// Probe stuff /////
 
 
