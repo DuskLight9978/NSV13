@@ -28,7 +28,7 @@
 
 /obj/machinery/atmospherics/components/unary/brc
 	name = "\improper Bluespace Reality Compressor" //Did you really need that spare reality?
-	desc = "Why dusk why"
+	desc = "Why dusk why" //10 out of 10 bluespace techs agree this was a bad idea
 	icon = 'nsv13/icons/obj/custom_crates.dmi'
 	icon_state = "large_cargo_crate"
 	density = TRUE
@@ -148,6 +148,7 @@
 		playsound(src, 'sound/items/flashlight_on.ogg', 100, TRUE)
 		to_chat(user, "<span class='notice'>Buffer transfered</span>")
 /obj/machinery/computer/ship/brc_console/attack_hand(mob/user)
+	.=..()
 	if(!compressor)
 		playsound(src, 'nsv13/sound/effects/computer/error.ogg')
 		to_chat(user, "<span class='warning'>Not presently linked to a compressor</span>")
@@ -156,6 +157,7 @@
 	ui_interact(user)
 
 /obj/machinery/computer/ship/brc_console/attack_robot(mob/user)
+	.=..()
 	if(!compressor)
 		playsound(src, 'nsv13/sound/effects/computer/error.ogg')
 		to_chat(user, "<span class='warning'>Not presently linked to a compressor</span>")
@@ -179,7 +181,7 @@
 		for(var/obj/machinery/atmospherics/components/unary/brc/brc in GLOB.machines)
 			if(brc.reactor_id == reactor_id)
 				compressor = brc
-/*
+
 /obj/machinery/computer/ship/brc_console/ui_act(action, params, datum/tgui/ui)
 	if(..())
 		return
@@ -193,10 +195,9 @@
 			//add alignment
 		if("toggle_active")
 			//either insert or retract slowly
-		if("toggle_gas")
-			//do we want to start eating gas modifications? make this take an age to open or close so engineering cannot game it in a cheesy way
-*/
-/*/obj/machinery/computer/ship/brc_console/ui_interact(mob/user, datum/tgui/ui)
+		if("toggle_gas")//do we want to start eating gas modifications? make this take an age to open or close so engineering cannot game it in a cheesy way
+
+/obj/machinery/computer/ship/brc_console/ui_interact(mob/user, datum/tgui/ui)
 	ui = SStgui.try_update_ui(user, src, ui)
 	if(!ui)
 		ui = new(user, src, "CompressorConsole")
@@ -206,7 +207,7 @@
 /obj/machinery/computer/ship/brc_console/ui_data(mob/user)
 	var/list/data = list()
 	//Soon
-*/
+
 
 //TODO TGUI Interactions.... and TGUI
 
@@ -233,7 +234,7 @@
 
  ///// Torn bluespace stuff /////
 /datum/weather/torn_bluespace
-	name = "torn bluespace" //Spawn unlimited lifetime anomalies that spawn hostile mobs. Make reality bubble. be spooky endtimes
+	name = "torn bluespace" //Spawn unlimited lifetime anomalies that spawn hostile mobs. Make reality bubble. be spooky endtimes in local space... At least until Bluespace tech Magivem gets there
 	desc = "Realities are competing in local space... you should evacuate."
 	telegraph_duration = 180
 	telegraph_message = "<span class='boldwarning'>Space distorts around you, Reality is tearing at the seams.</span>"
@@ -254,7 +255,7 @@
 
 /datum/weather/torn_bluespace/weather_act(mob/living/L)
 	L.adjustFireLoss(0.1) //This WILL add up and maybe kill you
-	L.adjustOxyLoss(0.1) //enough to make the healthbar wiggle, not enough to kill
+	L.adjustOxyLoss(0.1) //enough to make the healthbar wiggle, not enough to kill on its own
 
 /datum/weather/torn_bluespace/telegraph()
 	..()
@@ -282,7 +283,7 @@
 
 //Probes cannot be built, the must be purchased through cargo... probably via map override
 /obj/item/brc
-	name = "\improper Bluespace record crasher" //how did you even get this? (it was being made anyway, might as well properly define it)
+	name = "\improper Contained bluespace record crasher" //how did you even get this? (it was being made anyway, might as well properly define it)
 	desc = "A strange item, You feel you really shouldn't have this... and should likely call the closest bluespace tech!"
 	icon = 'nsv13/icons/obj/custom_crates.dmi'
 	icon_state = "large_carg_crate"
@@ -307,4 +308,20 @@
 	max_probe_integrity = 0
 
 
-//TODO Undefines
+//TODO(ne?) Undefines
+
+#undef NO_MOD
+#undef LOW_ABERRATIONS
+#undef HIGH_ABERRATIONS
+#undef RISKY_ABERRATIONS
+
+#undef PROBE_DETRIMENTAL
+#undef PROBE_NEUTRAL
+#undef PROBE_REPAIR
+
+#undef PLANE_NEUTRAL
+#undef PLANE_STABALIZING
+
+#undef PLANE_TORN
+
+#undef MAX_PROBES
