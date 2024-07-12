@@ -181,7 +181,7 @@
 		for(var/obj/machinery/atmospherics/components/unary/brc/brc in GLOB.machines)
 			if(brc.reactor_id == reactor_id)
 				compressor = brc
-
+/*
 /obj/machinery/computer/ship/brc_console/ui_act(action, params, datum/tgui/ui)
 	if(..())
 		return
@@ -208,7 +208,7 @@
 	var/list/data = list()
 	//Soon
 
-
+*/
 //TODO TGUI Interactions.... and TGUI
 
  ///// techweb and board stuff /////
