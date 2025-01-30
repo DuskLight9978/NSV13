@@ -37,10 +37,13 @@
 	var/obj/item/supplypod_beacon/beacon
 	var/sensor_mode = SENSOR_MODE_PASSIVE
 	var/radar_delay = MIN_RADAR_DELAY
+	//whether we can link dradis to a fighters FTL
+	var/dradis_linking = FALSE
 	// Whether we use DRADIS-assisted targeting.
 	var/dradis_targeting = FALSE
 	// Whether we can use the radar
 	var/can_use_radar = TRUE
+	var/can_use_atc = FALSE
 
 /obj/machinery/computer/ship/dradis/proc/can_radar_pulse()
 	if(!can_use_radar)
@@ -127,10 +130,18 @@ Called by add_sensor_profile_penalty if remove_in is used.
 	usingBeacon = !usingBeacon
 	to_chat(user, "<span class='sciradio'>You switch [src]'s trader delivery location to [usingBeacon ? "target supply beacons" : "target the default landing location on your ship"]</span>")
 	return TRUE
+/obj/machinery/computer/ship/dradis/master //not yet ready, Captains ATC when ready.
+	name= "\improper master DRADIS computer"
+	can_use_radar = TRUE
+	can_use_atc = TRUE
 
 /obj/machinery/computer/ship/dradis/minor //Secondary dradis consoles usable by people who arent on the bridge. All secondary dradis consoles should be a subtype of this
 	name = "air traffic control console"
 	can_use_radar = FALSE
+
+/obj/machinery/computer/ship/dradis/minor/atc
+	name ="air traffic control console2"
+	can_use_atc = TRUE
 
 /obj/machinery/computer/ship/dradis/minor/cargo //Another dradis like air traffic control, links to cargo torpedo tubes and delivers freight
 	name = "\improper Cargo freight delivery console"
@@ -308,6 +319,22 @@ Called by add_sensor_profile_penalty if remove_in is used.
 				return
 			newDelay = CLAMP(newDelay SECONDS, MIN_RADAR_DELAY, MAX_RADAR_DELAY)
 			radar_delay = newDelay
+		if("ftl_select_fighter")
+			var/obj/structure/overmap/small_craft/fighter = locate(params["fighter"])
+			if(fighter == linked || fighter.faction != linked.faction)
+				return
+			message_admins("FTL_SELECT_FIGHTER [fighter]")
+			if(alert(usr, "Activate the FTL sling on [fighter]? doing so will fling [fighter] to SYSTEM, they can only be picked up or sent back by a UTILITY!","Confirm","Yes","No")=="No")
+				message_admins("said No")
+				return
+			message_admins("said Yes")
+			return
+		if("ftl_select_system")
+			message_admins("FTL_SELECT_SYSTEM")
+			return
+		if("dradis_ftl_link")
+			dradis_linking = !dradis_linking
+			message_admins(" [dradis_linking]")
 		if("dradis_targeting")
 			if(!(linked.gunner == usr || linked.pilot == usr))
 				return
@@ -436,6 +463,7 @@ Called by add_sensor_profile_penalty if remove_in is used.
 	data["sensor_mode"] = (sensor_mode == SENSOR_MODE_PASSIVE) ? "Passive Radar" : "Active Radar"
 	data["pulse_delay"] = "[radar_delay / 10]"
 	data["dradis_targeting"] = dradis_targeting
+	data["dradis_linking"] = dradis_linking
 	data["can_target"] = (linked?.gunner == user || linked?.pilot == user)
 	if(can_radar_pulse())
 		data["can_radar_pulse"] = TRUE
@@ -444,6 +472,7 @@ Called by add_sensor_profile_penalty if remove_in is used.
 	else
 		data["can_radar_pulse"] = FALSE
 	data["can_use_radar"] = can_use_radar
+	data["can_use_atc"] = can_use_atc
 	return data
 
 /datum/asset/simple/overmap_flight

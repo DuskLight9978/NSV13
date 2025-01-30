@@ -19,18 +19,32 @@ export const DradisContent = (props, context) => {
       transition: "all 0.5s ease-out",
     };
     let markerType = "star_marker"+"_"+ship.alignment;
-    return (
-      <li key={ship.id}>
-        {!!ship.name && (
-          <Button unselectable="on" style={markerStyle} className={markerType}
-            content="" onClick={() => act('hail', { target: ship.id })}>
-            <span class="star_label">
-              <p>{ship.name}</p>
-            </span>
-          </Button>
-        )};
-      </li>
-    );
+    if (!dradis_linking) {
+      return (
+        <li key={ship.id}>
+          {!!ship.name && (
+            <Button unselectable="on" style={markerStyle} className={markerType}
+              content="" onClick={() => act('hail', { target: ship.id })}>
+              <span class="star_label">
+                <p>{ship.name}</p>
+              </span>
+            </Button>
+          )};
+        </li>
+      ); }
+    else {
+      return (
+        <li key={ship.id}>
+          {!!ship.name && (
+            <Button unselectable="on" style={markerStyle} className={markerType}
+              content="" onClick={() => act('ftl_select_fighter', { fighter: ship.id })}>
+              <span class="star_label">
+                <p>{ship.name}</p>
+              </span>
+            </Button>
+          )};
+        </li>
+      ); }
   };
 
   const DradisMap = (ships, zoom_factor, width_mod, focus_x, focus_y) => {
@@ -61,7 +75,9 @@ export const DradisContent = (props, context) => {
   let zoom_factor_max = data.zoom_factor_max;
   let scale_factor = zoom_factor*5;
   let dradis_targeting = data.dradis_targeting;
+  let dradis_linking = data.dradis_linking;
   let can_use_radar = data.can_use_radar;
+  let can_use_atc = data.can_use_atc;
   let dradis = DradisMap(data.ships, zoom_factor, data.width_mod, focus_x, focus_y);
 
   return (
@@ -90,6 +106,20 @@ export const DradisContent = (props, context) => {
                 content={data.pulse_delay}
                 icon="stopwatch"
                 onClick={() => act('radar_delay')} />
+            </>
+          )}
+          {!!data.can_use_atc && (
+            <>
+              <Button
+                content="FTL Sling Destination"
+                icon="sun"
+                onClick={() => act('ftl_select_system')} />
+              <Button
+                content={(dradis_linking) ? "FTL-Slinging" : "Hailing"}
+                icon={(dradis_linking) ? "tower-observation" : "square-o"}
+                disabled={!data.can_use_atc}
+                color={(data.dradis_linking) ? "bad" : "good"}
+                onClick={() => act('dradis_ftl_link')} />
             </>
           )}
           <Button
