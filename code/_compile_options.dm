@@ -67,7 +67,7 @@
 #if !defined(SPACEMAN_DMM) && (DM_VERSION < MIN_COMPILER_VERSION || DM_BUILD < MIN_COMPILER_BUILD) && !defined(FASTDMM)
 //Don't forget to update this part
 #error Your version of BYOND is too out-of-date to compile this project. Go to https://secure.byond.com/download and update.
-#error You need version 514.1583 or higher.
+#error You need version 515.1633 or higher.
 #endif
 //NSV - Donator Items
 // Enable personal donator items. Disabled by default. Might marginally improve compile performance.
@@ -117,18 +117,3 @@
 #error Building with Dream Maker is no longer supported and will result in errors.
 #error Switch to VSCode and when prompted install the recommended extensions, you can then either use the UI or press Ctrl+Shift+B to build the codebase.
 #endif
-
-#define AUXMOS (world.system_type == MS_WINDOWS ? "auxtools/auxmos.dll" : __detect_auxmos())
-
-/proc/__detect_auxmos()
-	var/static/auxmos_path
-	if(!auxmos_path)
-		if (fexists("./libauxmos.so"))
-			auxmos_path = "./libauxmos.so"
-		else if (fexists("./auxtools/libauxmos.so"))
-			auxmos_path = "./auxtools/libauxmos.so"
-		else if (fexists("[world.GetConfig("env", "HOME")]/.byond/bin/libauxmos.so"))
-			auxmos_path = "[world.GetConfig("env", "HOME")]/.byond/bin/libauxmos.so"
-		else
-			CRASH("Could not find libauxmos.so")
-	return auxmos_path
