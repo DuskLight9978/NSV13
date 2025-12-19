@@ -46,8 +46,9 @@ Bullet reactions
 			else
 				return FALSE //Shields absorbed the hit, so don't relay the projectile
 	P.spec_overmap_hit(src)
-	var/relayed_type = P.relay_projectile_type ? P.relay_projectile_type : P.type
-	relay_damage(relayed_type)
+	if(P.projectile_relaying_allowed)
+		var/relayed_type = P.relay_projectile_type ? P.relay_projectile_type : P.type
+		relay_damage(relayed_type)
 	if(!use_armour_quadrants)
 		return ..()
 	else
@@ -56,6 +57,7 @@ Bullet reactions
 		if(!QDELETED(src)) //Bullet on_hit effect might have already destroyed this object
 			//var/datum/vector2d/point_of_collision = src.physics2d?.collider2d.get_collision_point(P.physics2d?.collider2d)//Get the collision point, see if the armour quadrants need to absorb this hit.
 			take_quadrant_hit(run_obj_armor(P.damage, P.damage_type, P.flag, null, P.armour_penetration), quadrant_impact(P)) //This looks horrible, but trust me, it isn't! Probably!. Armour_quadrant.dm for more info
+			return BULLET_ACT_HIT
 
 /**
  * Used to relay a projectile impacting an overmap onto an overmap's interior zlevels.
@@ -81,22 +83,14 @@ Bullet reactions
 /obj/structure/overmap/small_craft/relay_damage(proj_type)
 	return
 
-/obj/structure/overmap/take_damage(damage_amount, damage_type = BRUTE, damage_flag = 0, sound_effect = 1, bypasses_shields = FALSE)
-	var/blocked = FALSE
+/obj/structure/overmap/take_damage(damage_amount, damage_type = BRUTE, damage_flag = 0, sound_effect = 1, nsv_damagesound = TRUE)
 	var/damage_sound = pick(GLOB.overmap_impact_sounds)
-	if(!bypasses_shields && shields && shields.absorb_hit(damage_amount))
-		blocked = TRUE
-		damage_sound = pick('nsv13/sound/effects/ship/damage/shield_hit.ogg', 'nsv13/sound/effects/ship/damage/shield_hit2.ogg')
-		if(!impact_sound_cooldown)
-			add_overlay(new /obj/effect/temp_visual/overmap_shield_hit(get_turf(src), src))
-	if(!impact_sound_cooldown && damage_sound)
+	if(nsv_damagesound && !impact_sound_cooldown && damage_sound)
 		relay(damage_sound)
 		if(damage_amount >= 15) //Flak begone
 			shake_everyone(5)
 		impact_sound_cooldown = TRUE
 		addtimer(VARSET_CALLBACK(src, impact_sound_cooldown, FALSE), 1 SECONDS)
-	if(blocked)
-		return FALSE
 	if(CHECK_BITFIELD(overmap_deletion_traits, DAMAGE_STARTS_COUNTDOWN) && !(CHECK_BITFIELD(overmap_deletion_traits, DAMAGE_DELETES_UNOCCUPIED) && !has_occupants())) //Code for handling "superstructure crit" countdown
 		if(obj_integrity <= damage_amount || structure_crit) //Superstructure crit! They would explode otherwise, unable to withstand the hit.
 			SEND_SIGNAL(src, COMSIG_ATOM_DAMAGE_ACT, damage_amount) //Sending the comsig here because we do not call parent in this case.

@@ -31,6 +31,7 @@
 			stop_piloting(gunner)
 		gunner = user
 	observe_ship(user)
+	increment_selected_weapon(user)
 	dradis?.attack_hand(user)
 	if(position & (OVERMAP_USER_ROLE_PILOT | OVERMAP_USER_ROLE_GUNNER))
 		user.add_verb(overmap_verbs) //Add the ship panel verbs
@@ -51,8 +52,10 @@
 	user.click_intercept = src
 
 /obj/structure/overmap/proc/stop_piloting(mob/living/M)
+	SEND_SIGNAL(M, COMSIG_STOPPED_PILOTING)
 	LAZYREMOVE(operators,M)
 	M.remove_verb(overmap_verbs)
+	drop_weapon_selection(M)
 	M.overmap_ship = null
 	if(M.click_intercept == src)
 		M.click_intercept = null
@@ -74,6 +77,11 @@
 	if(M.client)
 		M.client.view_size.resetToDefault()
 		M.client.overmap_zoomout = 0
+		for(var/V in M.actions) //Reset action buttons to stop the screen from staying large
+			var/datum/action/A = V
+			var/atom/movable/screen/movable/action_button/B = A.button
+			B.moved = FALSE
+		M.update_action_buttons(TRUE)
 	var/mob/camera/ai_eye/remote/overmap_observer/eyeobj = M.remote_control
 	M.cancel_camera()
 	if(M.client) //Reset px, y

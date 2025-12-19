@@ -28,6 +28,23 @@
 		GAS_NUCLEIUM,
 	)
 
+/obj/machinery/atmospherics/components/unary/plasma_loader/Destroy()
+	if(linked_gun)
+		linked_gun.loader = null
+		linked_gun = null
+	return ..()
+
+/obj/machinery/atmospherics/components/unary/plasma_loader/multitool_act(mob/living/user, obj/item/I)
+	. = TRUE
+	if(linked_gun)
+		return
+	var/obj/machinery/ship_weapon/plasma_caster/caster = locate() in orange(1, src)
+	if(!caster || caster.loader)
+		return
+	caster.loader = src
+	linked_gun = caster
+	to_chat(user, "<span class='notice'>You connect [src] to [caster].</span>")
+
 /obj/machinery/atmospherics/components/unary/plasma_loader/on_construction()
 	var/obj/item/circuitboard/machine/thermomachine/board = circuit
 	if(board)
@@ -75,7 +92,7 @@
 
 			var/transfer_moles = air1_pressure*environment.return_volume()/(air1.return_temperature() * R_IDEAL_GAS_EQUATION)
 			loc.assume_air_moles(air1, transfer_moles)
-			air_update_turf(1)
+			air_update_turf()
 
 			non_phoron = TRUE //Stop putting suggestive variables in my code BOBBANZ1!
 

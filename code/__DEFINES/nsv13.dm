@@ -74,7 +74,8 @@ GLOBAL_DATUM_INIT(conquest_role_handler, /datum/conquest_role_handler, new)
 
 #define COMSIG_SHIP_BOARDED "ship_boarded"
 #define COMSIG_GLOB_CHECK_INTERDICT "check_interdict"							//from interdiction component
-#define BEING_INTERDICTED (1<<0)											//returned on successful interdict
+#define WEAK_INTERDICT (1<<0)													//! Not a "true" interdiction in that it disrupts the drive field, relies on scrambling calculations and rendering a jump too dangerous to execute.
+#define STRONG_INTERDICT (1<<1)													//! The "true" interdiction, disrupts drive fields to the point any shift is impossible.
 
 //Gaming
 #define shares_overmap(A, B) (A.get_overmap() == B.get_overmap())
@@ -108,6 +109,7 @@ GLOBAL_DATUM_INIT(conquest_role_handler, /datum/conquest_role_handler, new)
 #define COMSIG_KB_OVERMAP_TOGGLEINERTIA_DOWN "keybinding_overmap_toggleinertia_down"
 #define COMSIG_KB_OVERMAP_TOGGLEMOUSEMOVE_DOWN "keybinding_overmap_togglemousemove_down"
 #define COMSIG_KB_OVERMAP_CYCLEFIREMODE_DOWN "keybinding_overmap_cyclefiremode_down"
+#define COMSIG_KB_OVERMAP_SPECIAL_WEAPON_ACTION_DOWN "keybinding_overmap_special_weapon_action_down"
 #define COMSIG_KB_OVERMAP_COUNTERMEASURE_DOWN "keybinding_overmap_countermeasure_down"
 #define COMSIG_KB_OVERMAP_TOGGLESAFETY_DOWN "keybinding_overmap_togglesafety_down"
 #define COMSIG_KB_OVERMAP_WEAPON1_DOWN "keybinding_overmap_weapon1_down"

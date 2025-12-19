@@ -152,12 +152,12 @@
 			if(EAST)
 				OM.desired_angle = 90
 			if(WEST)
-				OM.desired_angle = -90
+				OM.desired_angle = 270
 		if(!linked)
 			linkup()
 
 /obj/structure/fighter_launcher/proc/shake_people(var/obj/structure/overmap/OM)
-	if(OM?.operators.len)
+	if(OM && length(OM.operators))
 		for(var/mob/M in OM.operators)
 			shake_with_inertia(M, 10, 1)
 			to_chat(M, "<span class='warning'>You feel a sudden jolt!</span>")
@@ -389,6 +389,8 @@ d) the ships[] list of ssstarsystem is acting up again.
 	weapon_safety = TRUE
 	if(pilot)
 		to_chat(pilot, "<span class='notice'>Docking complete. <b>Gun safeties have been engaged automatically.</b></span>")
+	if(!pilot || pilot.incapacitated())
+		brakes = TRUE
 	SEND_SIGNAL(src, COMSIG_FTL_STATE_CHANGE)
 	if(reserved_z)
 		free_treadmills += reserved_z

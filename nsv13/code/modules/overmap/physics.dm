@@ -129,7 +129,7 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	disruption = max(0, disruption - 1)
 	if(hullburn > 0)
 		hullburn = max(0, hullburn - 1)
-		take_damage(hullburn_power, BURN, "fire", FALSE, TRUE) //If you want a ship to be resistant to hullburn, just give it fire armor.
+		take_damage(hullburn_power, BURN, "fire", FALSE) //If you want a ship to be resistant to hullburn, just give it fire armor.
 		if(hullburn == 0)
 			hullburn_power = 0
 	ai_process()
@@ -175,23 +175,22 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	last_offset.copy(offset)
 	var/last_angle = angle
 	if(!move_by_mouse && !ai_controlled)
-		desired_angle = angle + keyboard_delta_angle_left + keyboard_delta_angle_right + movekey_delta_angle
+		desired_angle = ((angle + keyboard_delta_angle_left + keyboard_delta_angle_right + movekey_delta_angle) + 360) % 360
 		movekey_delta_angle = 0
 	var/desired_angular_velocity = 0
 	if(isnum(desired_angle))
-		// do some finagling to make sure that our angles end up rotating the short way
-		while(angle > desired_angle + 180)
-			angle -= 360
-			last_angle -= 360
-		while(angle < desired_angle - 180)
-			angle += 360
-			last_angle += 360
-		if(abs(desired_angle - angle) < (max_angular_acceleration * time))
-			desired_angular_velocity = (desired_angle - angle) / time
-		else if(desired_angle > angle)
-			desired_angular_velocity = 2 * sqrt((desired_angle - angle) * max_angular_acceleration * 0.25)
+		var/bounded_desired_angle = desired_angle
+		if(bounded_desired_angle - angle > 180) //So far right we should be going left.
+			bounded_desired_angle -= 360
+		else if(bounded_desired_angle - angle < -180) //So far left we should be going right.
+			bounded_desired_angle += 360
+
+		if(abs(bounded_desired_angle - angle) < (max_angular_acceleration * time)) //<< ??? \/
+			desired_angular_velocity = (bounded_desired_angle - angle) / time //I'll be honest I have no idea what is going on here.
+		else if(bounded_desired_angle > angle)	//At least this part makes sense.
+			desired_angular_velocity = 2 * sqrt((bounded_desired_angle - angle) * max_angular_acceleration * 0.25)
 		else
-			desired_angular_velocity = -2 * sqrt((angle - desired_angle) * max_angular_acceleration * 0.25)
+			desired_angular_velocity = -2 * sqrt((-(bounded_desired_angle - angle)) * max_angular_acceleration * 0.25)
 
 	var/angular_velocity_adjustment = CLAMP(desired_angular_velocity - angular_velocity, -max_angular_acceleration*time, max_angular_acceleration*time)
 	if(angular_velocity_adjustment)
@@ -200,6 +199,20 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	else
 		last_rotate = 0
 	angle += angular_velocity * time
+	angle = (angle + 360) % 360 //Nightmare Nightmare Nightmare.
+
+	if(aiming && gunner && controlled_weapon_datum[gunner])
+		var/datum/overmap_ship_weapon/aimed_weapon = controlled_weapon_datum[gunner]
+		if(aimed_weapon.weapon_aim_flags & OSW_SIDE_AIMING_BEAM)
+			var/positive_diff = last_aiming_angle - angle //I swear everytime I write something like this I write it in a different way..
+			if(positive_diff < 0)
+				positive_diff += 360
+			if(positive_diff <= 180) //Adjust broadside angle for turn.
+				lastangle = (angle + 90) % 360
+			else
+				lastangle = (angle + 270) % 360
+			draw_beam(aimed_weapon = aimed_weapon)
+
 	// calculate drag and shit
 
 	var/velocity_mag = velocity.ln() // magnitude
@@ -414,10 +427,12 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	user_thrust_dir = 0
 	update_icon()
 	if(autofire_target && !aiming)
-		if(!gunner) //Just...just no. If we don't have this, you can get shot to death by your own fighter after youve already left it :))
+		if(!gunner || !controlled_weapon_datum[gunner]) //Just...just no. If we don't have this, you can get shot to death by your own fighter after youve already left it :))
 			autofire_target = null
-			return
-		fire(autofire_target)
+		else
+			var/datum/overmap_ship_weapon/autofire_weapon = controlled_weapon_datum[gunner]
+			if(istype(autofire_weapon))
+				fire(autofire_target, gunner, autofire_weapon)
 
 	// Lock handling
 	for(var/obj/structure/overmap/OM in target_painted)
@@ -438,6 +453,15 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 		return
 	return ..()
 
+/**
+ * Handles collision between two overmap objects.
+ * * other = the object collided with.
+ * * c_response = ????
+ * * collision_velocity = UNUSED
+ *
+ * * BEAR IN MIND col_angle and velocity angles go COUNTERCLOCKWISE starting EAST while (overmap) angle itself goes CLOCKWISE starting NORTH!!!!!
+ * * ^ ^ ^ ^ THIS IS REALLY IMPORTANT
+ */
 /obj/structure/overmap/proc/collide(obj/structure/overmap/other, datum/collision_response/c_response, collision_velocity)
 	//No colliders. But we still get a lot of info anyways!
 	if(!c_response)
@@ -452,7 +476,7 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 		if(((cos(src.velocity.angle() - col_angle) * src_vel_mag) - (cos(other.velocity.angle() - col_angle) * other_vel_mag)) < 0)
 			return
 
-		// Elastic collision equations
+		// Elastic collision equations - I don't feel like rewriting these so I'll just change the damage calculation unrelated to the new velocities :) ~Delta
 		var/new_src_vel_x = ((																			\
 			(src_vel_mag * cos(src.velocity.angle() - col_angle) * (src.mass - other.mass)) +			\
 			(2 * other.mass * other_vel_mag * cos(other.velocity.angle() - col_angle))					\
@@ -473,20 +497,46 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 			(2 * src.mass * src_vel_mag * cos(src.velocity.angle() - col_angle))						\
 		) / (other.mass + src.mass)) * sin(col_angle) + (other_vel_mag * sin(other.velocity.angle() - col_angle) * sin(col_angle + 90))
 
+		//New calculations, go!
+
+		//Calculate vector forces when angled towards collision angle.
+
+		var/self_vector_angle_diff = ((col_angle - velocity.angle()) + 360) % 360 //Byond modulo allows negative values as outcome apparently. :)
+		var/self_ramvec = src_vel_mag * cos(self_vector_angle_diff)
+
+		var/other_vector_angle_diff = ((col_angle + 180 - other.velocity.angle()) + 360) % 360
+		var/other_ramvec = other_vel_mag * cos(other_vector_angle_diff)
+
+		var/total_force = (self_ramvec + other_ramvec) //Forces combined
+
+		if(world.time >= next_collision && total_force >= 2) //Magic!
+			total_force *= OVERMAP_COLLISION_MAGNIFIER //Arbitrary amplifier to collisions (used to be x5, for now x4 because of new math)
+			//Impact forces applied to each ship.
+			var/own_impact_power = CLAMP(other.mass / mass, 0.2, 10) * (total_force * 0.5) //I'm kind of scared of how the masses of big chonkers are going to interact so I'm capping this for now :)
+			var/other_impact_power = CLAMP(mass / other.mass, 0.2, 10) * (total_force * 0.5)
+			if(self_ramvec > other_ramvec)
+				own_impact_power *= 2 //The one having more impact force towards the ramming vector takes more damage.
+			else
+				other_impact_power *= 2
+			var/list/impact_powers = list(own_impact_power, other_impact_power) //List for inplace adjustments
+			var/modulated_col_angle = (col_angle + 360) % 360
+			spec_collision_handling(other, impact_powers, modulated_col_angle)
+			impact_powers = reverseList(impact_powers)
+			other.spec_collision_handling(src, impact_powers, ((modulated_col_angle + 180) % 360))
+			own_impact_power = impact_powers[2] //Remember, we turned this around!
+			other_impact_power = impact_powers[1]
+			if(own_impact_power > 0)
+				take_quadrant_hit(own_impact_power, quadrant_impact(other))
+			if(other_impact_power > 0)
+				other.take_quadrant_hit(other_impact_power, other.quadrant_impact(src))
+
+			next_collision = world.time + OVERMAP_COLLISION_COOLDOWN
+			log_game("[key_name(pilot)] has impacted an overmap ship into [other] \[Total collision force:[total_force]\]")
+			//Uncomment for debug :)
+			//message_admins("COLLISION DEBUG: own mag / ramvec: \[[src_vel_mag]|[self_ramvec]\]; other mag / remvec: \[[other_vel_mag]|[other_ramvec]\]; total force / own force / other force: \[[total_force]|[own_impact_power]|[other_impact_power]\]; Angles - collision angle / vector angle / angle diff / other vector angle / other angle diff: \[CA[col_angle]|VA[velocity.angle()]|AD[self_vector_angle_diff]|OVA[other.velocity.angle()]|OAD[other_vector_angle_diff]\]")
+
 		src.velocity._set(new_src_vel_x, new_src_vel_y)
 		other.velocity._set(new_other_vel_x, new_other_vel_y)
-
-		var/bonk = src_vel_mag//How much we got bonked
-		var/bonk2 = other_vel_mag //Vs how much they got bonked
-		//Prevent ultra spam.
-		if(!impact_sound_cooldown && (bonk > 2 || bonk2 > 2))
-			bonk *= 5 //The rammer gets an innate penalty, to discourage ramming metas.
-			bonk2 *= 5
-			take_quadrant_hit(bonk, quadrant_impact(other)) //This looks horrible, but trust me, it isn't! Probably!. Armour_quadrant.dm for more info
-			other.take_quadrant_hit(bonk2, quadrant_impact(src)) //This looks horrible, but trust me, it isn't! Probably!. Armour_quadrant.dm for more info
-
-			log_game("[key_name(pilot)] has impacted an overmap ship into [other] with velocity [bonk]")
-
 		return TRUE
 
 	//Update the colliders before we do any kind of calc.
@@ -592,7 +642,14 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 		log_combat(pilot, M, "impacted", src, "with velocity of [bump_velocity]")
 	return ..()
 
-/obj/structure/overmap/proc/fire_projectile(proj_type, atom/target, speed=null, user_override=null, lateral=FALSE, ai_aim = FALSE, miss_chance=5, max_miss_distance=5, broadside=FALSE) //Fire one shot. Used for big, hyper accelerated shots rather than PDCs
+/**
+ * Causes the overmap to fire one projectile of passed proj_type and returns the object.
+ * * Careful: features two seperate speed args.
+ * * pixel_speed = effectively amount of iterations the vector advances in a single calculation. More efficient, but can cause phasing at high values.
+ * * projectile_speed = standard projectile speed, amount of delay in ticks per move (higher is slower).
+ * * Use whichever seems more appropriate.
+ */
+/obj/structure/overmap/proc/fire_projectile(proj_type, atom/target, pixel_speed = null, user_override = null, firing_flags = NONE, ai_aim = FALSE, miss_chance = 5, max_miss_distance = 5, spread_override = null, projectile_speed = null)
 	if(!z || QDELETED(src))
 		return FALSE
 	var/turf/T = get_center()
@@ -616,6 +673,10 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	proj.pixel_x = round(pixel_x)
 	proj.pixel_y = round(pixel_y)
 	proj.faction = faction
+	if(projectile_speed)
+		proj.speed = projectile_speed //This one is projectile speed. Delay in ticks per move.
+	if(!isnull(spread_override))
+		proj.spread = spread_override
 	if(physics2d && physics2d.collider2d)
 		proj.setup_collider()
 	if(proj.can_home)	// Handles projectile homing and alerting the target
@@ -635,24 +696,16 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	LAZYINITLIST(proj.impacted) //The spawn call after this might be causing some issues so the list should exist before async actions.
 
 	spawn()
-		proj.preparePixelProjectileOvermap(target, src, null, round((rand() - 0.5) * proj.spread), lateral=lateral)
-		proj.fire()
-		if(!lateral)
-			proj.setAngle(src.angle)
-		if(broadside)
-			if(angle2dir_ship(overmap_angle(src, target) - angle) == SOUTH)
-				proj.setAngle(src.angle + rand(90 - proj.spread, 90 + proj.spread))
-			else
-				proj.setAngle(src.angle + rand(270 - proj.spread, 270 + proj.spread))
-		//Sometimes we want to override speed.
-		if(speed)
-			proj.set_pixel_speed(speed)
-	//	else
-	//		proj.set_pixel_speed(proj.speed)
+		proj.preparePixelProjectileOvermap(target, src, firing_flags)
+		if(!QDELETED(proj))
+			proj.fire()
+			if(pixel_speed) //Careful, this is regarded as different to standard projectile.speed and sets its vector's pixel_speed instead (default:2).
+				proj.set_pixel_speed(pixel_speed) //Can cause phasing jank at high values, achieve bahavior with normal speed if your projectile is very fast.
 	return proj
 
 //Jank as hell. This needs to happen to properly set the visual offset :/
-/obj/item/projectile/proc/preparePixelProjectileOvermap(obj/structure/overmap/target, obj/structure/overmap/source, params, spread = 0, lateral=TRUE)
+//This entire proc is super cursed and I'm not sure why it was the way it was.
+/obj/item/projectile/proc/preparePixelProjectileOvermap(obj/structure/overmap/target, obj/structure/overmap/source, firing_flags)
 	var/turf/curloc = source.get_center()
 	var/turf/targloc = istype(target, /obj/structure/overmap) ? target.get_center() : get_turf(target)
 	trajectory_ignore_forcemove = TRUE
@@ -660,23 +713,25 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	trajectory_ignore_forcemove = FALSE
 	starting = curloc
 	original = target
-	if(!lateral)
+
+	if(firing_flags & OSW_ALWAYS_FIRES_BROADSIDES)
+		if(angle2dir_ship(overmap_angle(src, target) - source.angle) == SOUTH)
+			setAngle(source.angle + 90)
+		else
+			setAngle(source.angle + 270)
+	else if(firing_flags & OSW_ALWAYS_FIRES_ERRATIC_BROADSIDES)
+		if(prob(50))
+			setAngle(source.angle + 90)
+		else
+			setAngle(source.angle + 270)
+	else if(firing_flags & OSW_ALWAYS_FIRES_FORWARD)
 		setAngle(source.angle)
-
-	if(isliving(source) && params)
-		var/list/calculated = calculate_projectile_angle_and_pixel_offsets(source, params)
-		p_x = calculated[2]
-		p_y = calculated[3]
-
-		if(lateral)
-			setAngle(calculated[1] + spread)
-	else if(targloc && curloc)
-		yo = targloc.y - curloc.y
-		xo = targloc.x - curloc.x
-		if(lateral)
-			setAngle(overmap_angle(src, targloc) + spread)
-	else
-		stack_trace("WARNING: Projectile [type] fired without either mouse parameters, or a target atom to aim at!")
+	else if(curloc)
+		if(targloc)
+			setAngle(overmap_angle(curloc, targloc))
+		else//Lost target, just fire forwards.
+			setAngle(source.angle)
+	else //No loc, lets leave.
 		qdel(src)
 
 /// This makes us not drift like normal objects in space do
